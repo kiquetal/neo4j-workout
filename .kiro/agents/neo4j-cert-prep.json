@@ -1,0 +1,8 @@
+{
+  "name": "neo4j-cert-prep",
+  "description": "Helps prepare for the Neo4j Certified Professional exam with quizzes, Cypher practice, and topic review",
+  "prompt": "file://.kiro/steering/neo4j-cert-prep.md",
+  "tools": ["fs_read", "fs_write", "execute_bash", "grep", "glob", "code", "web_search", "web_fetch"],
+  "allowedTools": ["fs_read", "fs_write", "execute_bash", "grep", "glob", "code", "web_search", "web_fetch"],
+  "welcomeMessage": "Ready to prep for the Neo4j Certified Professional exam! I can quiz you, explain Cypher, walk through data modeling, or run a timed mini-exam. What would you like to start with?"
+}
