@@ -81,5 +81,8 @@ docker compose up -d
 ## Build & Run
 
 ```bash
-mvn compile
+mvn compile                                # compile
+./run.sh Neo4jConnection                   # test connectivity
+./run.sh sessions.Session01Platform        # run session 01
+./run.sh sessions.Session02Cypher          # run session 02 (etc.)
 ```
