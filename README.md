@@ -68,6 +68,16 @@ Sessions are tracked in `docs/session-tracker.md`. Topics scoring < 80% get prio
 5. [Intermediate Cypher Queries](https://graphacademy.neo4j.com) (~4 hrs)
 6. [Building Neo4j Applications with Java](https://graphacademy.neo4j.com)
 
+## Local Neo4j (Docker)
+
+```bash
+docker compose up -d
+```
+
+- Browser: http://localhost:7474
+- Bolt: `bolt://localhost:7687`
+- Auth: `neo4j` / `workout123`
+
 ## Build & Run
 
 ```bash
