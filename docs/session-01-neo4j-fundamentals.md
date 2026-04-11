@@ -91,6 +91,18 @@ RETURN r // Returns the relationship 'r' with all its type and properties
 *   **Explanation**: Similar to nodes, `RETURN r` returns the entire relationship object, including its type and all properties.
 *   **Alternative**: You can use `RETURN properties(r)` to get just the properties of the relationship as a map.
 
+**3. Returning Entire Path Segments (Nodes and Relationships Together):**
+
+To obtain the nodes and the relationship that connect them in your results, simply `RETURN` all the variables bound in your `MATCH` pattern. This is especially useful for visualization in tools like Neo4j Browser.
+
+**Scenario**: You want to see the specific actor, their `ACTED_IN` relationship, and the movie they acted in, all as interconnected entities.
+
+```cypher
+MATCH (p:Person {name: 'Tom Hanks'})-[r:ACTED_IN]->(m:Movie {title: 'Forrest Gump'})
+RETURN p, r, m
+```
+*   **Explanation**: This returns the full `Person` node (`p`), the `ACTED_IN` relationship (`r`), and the `Movie` node (`m`), showing their connection. This provides a complete "path segment" for the matched pattern.
+
 
 ## MERGE Clause: Create or Match
 
