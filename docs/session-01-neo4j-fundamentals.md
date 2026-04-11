@@ -67,6 +67,31 @@ RETURN p.name, size((p)--()) AS NodeDegree
 | Charlie | 1          |
 ```
 
+### Querying Node and Relationship Properties
+
+Retrieving properties associated with nodes and relationships is fundamental to extracting detailed information from your graph.
+
+**Scenario**: You want to see all details (properties) of a specific actor and a specific relationship they have with a movie.
+
+**1. Querying all properties of a Node:**
+
+```cypher
+MATCH (p:Person {name: 'Tom Hanks'})
+RETURN p // Returns the node 'p' with all its labels and properties
+```
+*   **Explanation**: The `RETURN p` clause directly returns the entire node object, which includes all its labels and properties.
+*   **Alternative**: You can use `RETURN properties(p)` to get just the properties as a map.
+
+**2. Querying all properties of a Relationship:**
+
+```cypher
+MATCH (p:Person {name: 'Tom Hanks'})-[r:ACTED_IN]->(m:Movie {title: 'Forrest Gump'})
+RETURN r // Returns the relationship 'r' with all its type and properties
+```
+*   **Explanation**: Similar to nodes, `RETURN r` returns the entire relationship object, including its type and all properties.
+*   **Alternative**: You can use `RETURN properties(r)` to get just the properties of the relationship as a map.
+
+
 ## MERGE Clause: Create or Match
 
 The `MERGE` clause ensures that a pattern (node or relationship) exists in the graph. If the pattern is found, it acts like `MATCH`. If it's not found, it acts like `CREATE`. `MERGE` is atomic and idempotent, making it a powerful tool for managing data.
