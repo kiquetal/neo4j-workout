@@ -154,4 +154,74 @@ The `MERGE` clause ensures that a pattern (node or relationship) exists in the g
     ```
     (Note: If `WORKS_FOR` should also be merged for idempotency, then `MERGE (p)-[:WORKS_FOR]->(c)` would be used instead of `CREATE` for the relationship).
 
+## REMOVE and DELETE Clauses: Modifying and Deleting Graph Elements
+
+These clauses are used to remove labels or properties from existing elements, or to delete elements (nodes, relationships) entirely from the graph.
+
+### REMOVE Clause
+
+The `REMOVE` clause is used to delete specific **properties** from nodes or relationships, or to remove **labels** from nodes. It does not delete the node or relationship itself.
+
+**Use Cases:**
+*   Removing an outdated property.
+*   Changing a node's primary label or removing a secondary label.
+
+**1. Removing a Property from a Node:**
+```cypher
+MATCH (p:Person {name: 'Alice'})
+REMOVE p.age
+RETURN p
+```
+*   **Explanation**: Finds 'Alice' and removes the `age` property from her node.
+
+**2. Removing a Property from a Relationship:**
+```cypher
+MATCH (p:Person {name: 'Tom Hanks'})-[r:ACTED_IN]->(m:Movie {title: 'Forrest Gump'})
+REMOVE r.roles // Assuming 'roles' is a property on the ACTED_IN relationship
+RETURN r
+```
+*   **Explanation**: Removes the `roles` property from the specific `ACTED_IN` relationship.
+
+**3. Removing a Label from a Node:**
+```cypher
+MATCH (p:Person {name: 'Charlie'})
+REMOVE p:Customer // Remove the 'Customer' label from Charlie
+RETURN p
+```
+*   **Explanation**: Finds 'Charlie' and removes the `Customer` label. Charlie might still have other labels (e.g., `:Person`).
+
+### DELETE Clause
+
+The `DELETE` clause is used to remove nodes and relationships from the graph entirely. Its behavior differs significantly depending on whether a node has existing relationships.
+
+**1. Deleting a Relationship:**
+This is straightforward.
+```cypher
+MATCH (p:Person {name: 'Alice'})-[r:FRIENDS_WITH]->(f:Person {name: 'Bob'})
+DELETE r
+```
+*   **Explanation**: Finds the specific `FRIENDS_WITH` relationship between Alice and Bob and deletes only that relationship. The nodes Alice and Bob remain.
+
+**2. Deleting a Node WITHOUT Relationships:**
+If a node has no relationships connected to it, you can `DELETE` it directly.
+```cypher
+MATCH (orphan:NodeWithNoRelations)
+WHERE NOT (orphan)--() // Ensure it has no relationships
+DELETE orphan
+```
+*   **Explanation**: Finds an 'orphan' node and deletes it.
+
+**3. Deleting a Node WITH Relationships (Important Behavior!):**
+Neo4j has a strict rule: **You cannot delete a node if it still has relationships connected to it.** Attempting to do so with just `DELETE n` will result in an error. This rule prevents "orphan" relationships from existing in the graph, which would violate the fundamental graph structure.
+
+To delete a node that has relationships, you must explicitly tell Neo4j to also delete all of its relationships. This is done using `DETACH DELETE`.
+
+**`DETACH DELETE` (Recommended for nodes with relationships):**
+```cypher
+MATCH (p:Person {name: 'Alice'})
+DETACH DELETE p
+```
+*   **Explanation**: Finds the node 'Alice', **first deletes all relationships** connected to Alice (both incoming and outgoing), and then **deletes Alice herself**. This is the most common way to delete nodes that are part of the graph's structure.
+
+
 
