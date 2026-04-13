@@ -9,8 +9,8 @@ Graph data modeling is the process of designing how your domain maps onto nodes,
 | Element | What it represents | Example |
 |---------|--------------------|---------|
 | **Node** | An entity or thing | `(:Person)`, `(:Movie)` |
-| **Label** | A category/type on a node | `:Actor`, `:Director` (a node can have multiple) |
-| **Relationship** | A connection between two nodes, always directed, always has a type | `-[:ACTED_IN]->` |
+| **Label** | A category/type for a node, representing the dominant entities in your use cases | `:Actor`, `:Director` (a node can have multiple) |
+| **Relationship** | The **verb** connecting two nodes. It is always directed and has a type. | `-[:ACTED_IN]->` |
 | **Property** | Key-value pair on a node or relationship | `name: 'Tom Hanks'`, `rating: 4.5` |
 
 ---
@@ -53,6 +53,9 @@ This is one of the most tested areas on the exam.
 
 ### Use a Property when:
 - The value is a simple attribute that belongs to one entity
+- It helps to uniquely identify a node (e.g., a `productID` or `email` property)
+- It's needed to answer specific questions for your use case
+- It represents the data you want to return in your query results
 - You don't need to traverse through it or connect it to other things
 - Example: `born: 1956` on a `:Person` node
 
@@ -83,6 +86,55 @@ Best practice: store direction based on the natural semantic ("Tom ACTED_IN The 
 - A node can have **multiple labels**: `(:Person:Actor:Director)`
 - Labels are used by **indexes and constraints** — they're the primary lookup mechanism
 - Avoid over-labeling; each label should serve a query or constraint purpose
+
+---
+
+### Labeling Best Practice: Use Orthogonal Concepts
+
+The term **"semantically orthogonal"** means that labels on a single node should represent independent, non-overlapping concepts. Think of them as different facets of an entity's identity (its type, its role, its state), not as data values.
+
+A common anti-pattern is to use labels to store data, such as a location.
+
+#### Anti-Pattern: Using Labels to Store Data
+
+Imagine you have customers and stores and you want to record their region.
+
+```cypher
+// Don't do this!
+CREATE (:Customer:USA {name: 'Bob'})
+CREATE (:Store:EMEA {name: 'Main St Store'})
+```
+
+**Why this is a bad model:**
+- **Labels are not for data:** The region (`USA`, `EMEA`) is an attribute, a piece of data. Storing it as a label is misusing the feature.
+- **Label Proliferation:** If you have 100 regions, you will create 100 labels, which pollutes the database schema and is hard to manage.
+- **Inefficient Queries:** A query to find all entities in the USA (`MATCH (n:USA) RETURN n`) is inefficient because it forces the database to look at conceptually different nodes (Customers, Stores, etc.) that have nothing in common besides their location.
+
+#### Best Practice: Use Properties or Nodes for Data
+
+The correct way to model this is to treat the region as a property or, even better, as its own connected node.
+
+**Option 1: Using a Property (Good)**
+
+```cypher
+CREATE (:Customer {name: 'Bob', region: 'USA'})
+CREATE (:Store {name: 'Main St Store', region: 'EMEA'})
+```
+This is much cleaner. The region is now a simple attribute, and you can create an index on the `region` property for fast lookups.
+
+**Option 2: Using a Connected Node (Often Best)**
+
+This follows the "Reification" pattern mentioned earlier and is the most powerful graph-native approach.
+
+```cypher
+CREATE (:Customer {name: 'Bob'})-[:LOCATED_IN]->(:Region {name: 'USA'})
+CREATE (:Store {name: 'Main St Store'})-[:LOCATED_IN]->(:Region {name: 'EMEA'})
+```
+This approach allows for powerful traversal queries, such as "Find all stores in the same region as customer Bob."
+
+**Rule of Thumb:**
+- A **Label** answers: "What *is* this thing?" (e.g., `:Person`, `:Product`).
+- A **Property** answers: "What is an attribute *of* this thing?" (e.g., `name: 'Bob'`, `region: 'USA'`).
 
 ---
 
@@ -216,3 +268,72 @@ LIMIT 10
 - Direction is stored but can be ignored in queries
 - Supernodes are a real performance concern
 - Refactoring is normal and expected as requirements evolve
+
+---
+
+## Additional Notes
+
+- **Fundamental Requirement:** For a relationship to exist, it *must* have a start node and an end node. It cannot exist independently.
+- **Self-referencing relationships:** A node can have a relationship to itself (i.e., the start and end node can be the same). For example, a `(:Person)-[:MANAGES]->(:Person)` relationship can be used to model an organization chart.
+- **Relationship properties:** Relationship properties are often used to add weight or metadata to a connection. For example, in a social network, a `[:FRIENDS_WITH {since: '2023-01-15'}]` relationship can store when the friendship started.
+- **Multi-relationalships:** It is possible to have multiple relationships between the same two nodes. For example, a person can be both an `:ACTOR` and a `:DIRECTOR` in the same movie. This would be modeled as `(:Person)-[:ACTED_IN]->(:Movie)` and `(:Person)-[:DIRECTED]->(:Movie)`.
+- **Schema design vs. schema-less:** While Neo4j is often described as schema-less, it's more accurate to say it has a flexible schema. You can enforce a schema with constraints and indexes, which is highly recommended for production applications.
+
+---
+
+## Managing Node Labels (`CREATE`, `SET`, `REMOVE`)
+
+Labels are the core mechanism for typing or categorizing your nodes. Here's how to manage them throughout the lifecycle of your data.
+
+### 1. Setting Labels on NEW Nodes with `CREATE`
+
+This is the most common method. The label is assigned at the moment the node is created.
+
+**Syntax**: `CREATE (variable:LabelName {properties})`
+
+**Example:**
+Create a new node for a person named "Alice".
+
+```cypher
+CREATE (p:Person {name: 'Alice', born: 1990})
+```
+- `(p:Person)`: We create a node with the label `:Person` and refer to it with the variable `p`.
+
+**Creating a Node with Multiple Labels:**
+Simply add the labels one after another, each prefixed with a colon.
+
+```cypher
+-- Create a node that is both a User and an Admin
+CREATE (ua:User:Admin {username: 'charlie', lastLogin: timestamp()})
+```
+
+### 2. Adding Labels to EXISTING Nodes with `SET`
+
+If a node already exists, you can add new labels to it. This is a common pattern for modeling changes in state (e.g., a user becomes a customer).
+
+**Syntax**: `MATCH (variable WHERE condition) SET variable:NewLabel`
+
+**Example:**
+Alice, who already exists as a `:Person`, has now become a customer. We need to add the `:Customer` label.
+
+```cypher
+MATCH (p:Person {name: 'Alice'})
+SET p:Customer
+RETURN p
+```
+The `SET` command is additive; it will not remove the existing `:Person` label. Alice's node will now have both `:Person` and `:Customer` labels.
+
+### 3. Removing Labels from EXISTING Nodes with `REMOVE`
+
+The opposite of `SET` is `REMOVE`. This is used when a node no longer belongs to a certain category.
+
+**Syntax**: `MATCH (variable WHERE condition) REMOVE variable:LabelToRemove`
+
+**Example:**
+If Alice is no longer a customer, we can remove that specific label.
+
+```cypher
+MATCH (p:Person:Customer {name: 'Alice'})
+REMOVE p:Customer
+```
+This query finds Alice and removes *only* the `:Customer` label, leaving the `:Person` label intact.
