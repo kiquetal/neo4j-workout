@@ -174,12 +174,7 @@ After: `(:Person)-[:ACTED_IN {role: 'Forrest'}]->(:Movie)`
 
 Why: simpler traversal when the intermediate node adds no value.
 
-### 3. Relationship → Intermediate Node
-
-Before: `(:User)-[:RATED {score: 5}]->(:Movie)`
-After: `(:User)-[:WROTE]->(:Review {score: 5, text: '...'})-[:REVIEWS]->(:Movie)`
-
-Why: when the relationship grows complex enough to warrant its own identity (e.g., reviews with text, timestamps, votes).
+### 4. Adding Labels for Query Performance
 
 ### 4. Adding Labels for Query Performance
 
