@@ -35,14 +35,28 @@ WHERE toLower(m.title) STARTS WITH 'the '
 RETURN m.title
 ```
 
-### Handling Lists of Strings
-If a property (like `m.countries`) is a **List of Strings**, you cannot use `toLower()` directly on the entire list. You must either use list comprehension or the `ANY()` predicate to check each element individually:
+### Handling Lists of Strings (Case-Insensitive)
+If a property (like `m.countries`) is a **List of Strings**, you cannot use `toLower()` directly on the entire list. You must use the `ANY()` predicate to check each element individually:
+
+**1. Exact Match (Case-Insensitive) inside a List:**
+If you want to find an exact match for "Germany", but you aren't sure if it's stored as "GERMANY", "Germany", or "germany":
 
 ```cypher
-// Check if any country in the list, when converted to lowercase, starts with 'jam'
 MATCH (m:Movie)
 WHERE m.countries IS NOT NULL
-  AND ANY(country IN m.countries WHERE toLower(country) STARTS WITH 'jam')
+  // Look at EVERY country in the list, make it lowercase, and see if it equals 'germany'
+  AND ANY(country IN m.countries WHERE toLower(country) = 'germany')
+RETURN m.title, m.countries
+```
+
+**2. Partial Match (Case-Insensitive) inside a List:**
+If you want to find any country in the list that *contains* or *starts with* "ger":
+
+```cypher
+MATCH (m:Movie)
+WHERE m.countries IS NOT NULL
+  // Look at EVERY country in the list, make it lowercase, and see if it CONTAINS 'ger'
+  AND ANY(country IN m.countries WHERE toLower(country) CONTAINS 'ger')
 RETURN m.title, m.countries
 ```
 
