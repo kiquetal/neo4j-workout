@@ -208,6 +208,56 @@ RETURN d.name AS Director,
        max(m.imdbRating) AS highestRating
 ```
 
+## Working with Date and Time (Temporal Types)
+
+Neo4j provides robust built-in temporal types for handling dates, times, and durations. 
+
+### 1. Creating Dates
+You can create dates using the `date()` function, either for the current day, from a string, or from specific components.
+
+```cypher
+// Get today's date
+RETURN date() AS today
+
+// Create a date from an ISO 8601 formatted string
+RETURN date('2023-10-25') AS stringDate
+
+// Create a date from individual components
+RETURN date({year: 2023, month: 10, day: 25}) AS componentDate
+```
+
+### 2. Accessing Date Components
+Once you have a temporal object, you can easily extract its parts using dot notation (e.g., `.year`, `.month`, `.day`).
+
+```cypher
+WITH date('2023-10-25') AS myDate
+RETURN myDate.year AS year, myDate.month AS month, myDate.day AS day
+```
+
+### 3. Comparing Dates
+Temporal types can be compared directly using standard operators (`<`, `>`, `=`).
+
+```cypher
+// Find movies released after January 1st, 2000
+// (Assuming m.releaseDate is stored as a Date type)
+MATCH (m:Movie)
+WHERE m.releaseDate > date('2000-01-01')
+RETURN m.title, m.releaseDate
+```
+
+### 4. Working with Durations
+You can use the `duration()` function to add or subtract time, or find the difference between two dates using `duration.between()`.
+
+```cypher
+// Add 2 months and 5 days to today's date
+RETURN date() + duration({months: 2, days: 5}) AS futureDate
+
+// Calculate an actor's current age based on their birth date
+MATCH (p:Person {name: 'Tom Hanks'})
+// Assuming p.birthDate is stored as a Date
+RETURN p.name, duration.between(p.birthDate, date()).years AS age
+```
+
 ## Performance Tuning (EXPLAIN / PROFILE)
 
 ## Schema Discovery
