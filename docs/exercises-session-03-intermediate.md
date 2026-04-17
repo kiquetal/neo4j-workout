@@ -21,3 +21,11 @@ These exercises are designed to test your knowledge on intermediate Cypher query
 ## Exercise 5: Temporal Types
 **Scenario:** We need to find older movies in the database.
 **Task:** Write a query that finds all `Movie` nodes where the `released` property (which is a Date type) has a year before 1990. Return the movie title and the release year.
+
+## Exercise 6: Unwinding Lists
+**Scenario:** You have a hardcoded list of movie titles: `['The Matrix', 'Top Gun', 'Jerry Maguire']`. You want to find these movies in the database and see when they were released without writing multiple `MATCH` clauses or a long `WHERE title IN [...]` clause.
+**Task:** Write a query that defines this list as a variable, uses `UNWIND` to turn the list into individual rows, and then matches the `Movie` nodes by their title. Return the title and the release year.
+
+## Exercise 7: Using UNWIND to Deduplicate a List
+**Scenario:** An application sent you a list of tags to add to a movie, but the list contains duplicates: `['Action', 'Sci-Fi', 'Action', 'Thriller', 'Sci-Fi']`.
+**Task:** Write a query that takes this list, uses `UNWIND` to break it apart, removes the duplicates using `WITH DISTINCT`, and uses `collect()` to return a single, deduplicated list of tags.

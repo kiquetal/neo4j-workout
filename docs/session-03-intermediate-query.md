@@ -62,6 +62,54 @@ RETURN m.title, m.countries
 
 ## Working with Lists and Paths
 
+### Unwinding Lists (UNWIND)
+The `UNWIND` clause does the exact opposite of `collect()`. It takes a list and transforms it back into individual rows. This is extremely useful for transforming data, passing arrays of parameters into a query, or filtering elements of a list.
+
+**Example 1: Turning a list into rows**
+```cypher
+WITH [1, 2, 3] AS my_list
+UNWIND my_list AS number
+RETURN number
+```
+*(This returns 3 rows: 1, 2, and 3)*
+
+**Example 2: Unwinding to match and create**
+If you have a movie with a list of genres and want to create a node for each genre and connect it to the movie:
+```cypher
+MATCH (m:Movie {title: 'The Matrix'})
+WITH m, ['Sci-Fi', 'Action'] AS genres
+UNWIND genres AS genreName
+MERGE (g:Genre {name: genreName})
+MERGE (m)-[:IN_GENRE]->(g)
+```
+
+**Example 3: Removing Duplicates from a List**
+You can use `UNWIND` in combination with `WITH DISTINCT` and `collect()` to remove duplicates from a list:
+```cypher
+WITH ['apple', 'banana', 'apple', 'orange'] AS fruits
+UNWIND fruits AS fruit
+WITH DISTINCT fruit
+RETURN collect(fruit) AS uniqueFruits
+```
+
+### The Golden Rule of UNWIND and Aggregation
+When unwinding a list property from a node to perform an aggregation (like counting or collecting), you **must** understand how Cypher handles the intermediate rows.
+
+**The Rule: `UNWIND` creates a Cartesian product (multiplies rows). To aggregate those rows back together, you use an aggregation function alongside the grouping variable.**
+
+**Step-by-step Execution:**
+1. **MATCH:** `MATCH (m:Movie)` (Assume 1 Movie node `m1` with `countries: ['USA', 'UK']`)
+2. **UNWIND:** `UNWIND m.countries AS country`
+   *This turns 1 row into 2 rows in memory:*
+   * Row 1: `m1`, `'USA'`
+   * Row 2: `m1`, `'UK'`
+3. **RETURN (Implicit Grouping):** `RETURN country, count(m)`
+   *Cypher sees `count()` and groups by everything else (`country`).*
+   * It groups all `'USA'` rows together, and counts the `m` nodes inside that group.
+   * It groups all `'UK'` rows together, and counts the `m` nodes inside that group.
+
+*Important Note:* Always ensure the variables you want to count (like `m`) are passed through any intermediate `WITH` clauses! If you do `WITH trim(country) AS country`, the variable `m` is lost and cannot be counted later. Always do `WITH m, trim(country) AS country`.
+
 ## Sorting and Limiting Results
 
 To find specific records, you can combine `ORDER BY` with multiple properties and `LIMIT` the results. 
@@ -150,7 +198,98 @@ CALL apoc.do.when(
 RETURN value.p AS Person
 ```
 
-## Subqueries
+## Subqueries and UNIONs
+
+### UNION and UNION ALL
+In Cypher, `UNION` allows you to combine the results of two or more separate queries into a single result set. The queries you are joining must return the **exact same variable names and data types** in their `RETURN` clauses.
+
+There are two variations:
+1.  **`UNION ALL`**: Combines the results and **keeps all duplicates**. This is faster because Neo4j simply appends the results together. It is considered best practice to default to `UNION ALL` for performance reasons unless you specifically need deduplication.
+2.  **`UNION`**: Combines the results and **removes all duplicates**. This is slower because Neo4j must sort and deduplicate the combined result set before returning it.
+
+### The Difference in Practice
+
+**Scenario:** You want a list of all names associated with movies. Clint Eastwood both directed and acted in *Unforgiven*, so he will be found by both queries.
+
+**Example 1: Using UNION (Removing Duplicates)**
+You just want a list of unique names.
+
+```cypher
+// Query 1: Find Actors
+MATCH (a:Person)-[:ACTED_IN]->(m:Movie)
+RETURN a.name AS PersonName
+
+UNION
+
+// Query 2: Find Directors
+MATCH (d:Person)-[:DIRECTED]->(m:Movie)
+RETURN d.name AS PersonName
+```
+*Result:* 'Clint Eastwood' appears **once**. The database had to do extra work to compare all the rows and remove his second entry.
+
+**Example 2: Combining Actors and Directors with Roles (UNION ALL)**
+If we want to track the *role* they played, the rows are inherently different (`['Clint Eastwood', 'Actor']` vs `['Clint Eastwood', 'Director']`). We use `UNION ALL` because we want both rows, and it is faster since we don't need the database to spend time looking for duplicates.
+
+```cypher
+// Query 1: Find Actors
+MATCH (a:Person)-[:ACTED_IN]->(m:Movie)
+RETURN a.name AS PersonName, 'Actor' AS Role
+
+UNION ALL
+
+// Query 2: Find Directors
+MATCH (d:Person)-[:DIRECTED]->(m:Movie)
+RETURN d.name AS PersonName, 'Director' AS Role
+```
+*Result:* 'Clint Eastwood' appears **twice**, once for each role.
+
+**Important Rules for UNION:**
+*   You cannot use `WITH` or `MATCH` immediately *after* a `UNION`. The `UNION` operator must connect two complete, independent queries that end in a `RETURN` clause.
+*   If you need to process the combined results of a `UNION` (e.g., to sort or aggregate the final list), you must wrap the entire `UNION` block inside a `CALL {}` subquery (which we will cover next).
+
+## Query Parameters (Best Practice)
+
+Up until now, we've often hardcoded values (like names or years) directly into our queries. In a real application, you should **never** hardcode values. Instead, you use **Parameters** (denoted by a `$` symbol).
+
+### Why use Parameters?
+1.  **Performance (Execution Plan Caching):** Neo4j caches the execution plan of a query. `MATCH (p:Person {name: 'Robert'})` and `MATCH (p:Person {name: 'Kevin'})` are treated as two entirely different queries. But `MATCH (p:Person {name: $actorName})` is compiled once and reused instantly, leading to faster execution.
+2.  **Security (Cypher Injection Prevention):** Parameters protect against Cypher Injection attacks. When you pass parameters, the values are treated as data, not as part of the query structure, preventing malicious input from altering your query.
+3.  **Readability and Maintainability:** Makes queries cleaner and easier to read, especially when dealing with complex values or many filters.
+
+### How it looks:
+```cypher
+// Instead of this (hardcoded):
+MATCH (p:Person {name: 'Robert Blake'})-[:ACTED_IN]->(m:Movie)
+
+// You write this (with parameter):
+MATCH (p:Person {name: $actorName})-[:ACTED_IN]->(m:Movie)
+```
+
+*Note: If you are testing in the Neo4j Desktop/Browser, you can declare a parameter before running your query by typing:*
+`:param actorName => 'Robert Blake'`
+
+### Combining with UNION ALL example
+Let's revisit your `UNION ALL` query. If you wanted to make it dynamic for any given year, you would parameterize the `WHERE` clause:
+```cypher
+CALL {
+    MATCH (m:Movie)<-[:ACTED_IN]-(p:Person)
+    WHERE m.year = $targetYear // Using a parameter
+    RETURN 
+        "Actor" AS type,
+        p.name AS name,
+        collect(m.title) AS movies
+    UNION ALL
+    MATCH (m:Movie)<-[:DIRECTED]-(p:Person) 
+    WHERE m.year = $targetYear // Using the same parameter here
+    RETURN 
+        "Director" AS type,
+        p.name AS name,
+        collect(m.title) AS movies 
+}
+RETURN type, name, movies
+ORDER BY name ASC
+LIMIT 20
+```
 
 ## Advanced Aggregations and Grouping
 
