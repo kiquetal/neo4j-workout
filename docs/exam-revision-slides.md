@@ -348,6 +348,16 @@ RETURN duration.between(d1, d2).years  // difference
 
 ---
 
+### Slide 3.14 — Hands-on Challenges (Cypher)
+
+1.  **Basic Read:** Find all movies released after the year 2000.
+2.  **Targeted Read:** Who directed the movie 'The Matrix'?
+3.  **Traversal:** List the names of all actors who acted in 'The Matrix'.
+4.  **Complex Pattern:** Find actors who have both acted in and directed at least one movie.
+5.  **List Operations:** Use `UNWIND` on a list of titles `['The Matrix', 'Forrest Gump']` to return the release year for each movie.
+
+---
+
 ## TOPIC 4: Graph Data Modeling
 
 ---
@@ -404,6 +414,13 @@ AFTER:  (:User)-[:WROTE]->(:Review {score: 5, text: '...'})-[:REVIEWS]->(:Movie)
 - **Extract node from property**: Turn `m.genre = 'Sci-Fi'` into `(m)-[:IN_GENRE]->(g:Genre {name: 'Sci-Fi'})`
 - **Qualify relationships**: Split `:ACTED_IN` into `:ACTED_IN_2023`, `:ACTED_IN_2024` for time-based filtering
 - **Merge duplicate nodes**: Use `MERGE` + unique constraints to deduplicate
+
+---
+
+### Slide 4.6 — Hands-on Challenges (Modeling)
+
+1.  **Refactor Property to Node:** The `Movie` node has a `genres` property which is a list of strings (e.g., `['Action', 'Sci-Fi']`). Write a query to create distinct `:Genre` nodes for each genre and connect movies to them with an `:IN_GENRE` relationship.
+2.  **Add New Entity (Reification):** Your users want to write reviews. A `:Review` node is needed. It should be connected to the `:Person` who wrote it and the `:Movie` it is for. It should have `score` (1-5) and `text` properties. Write the Cypher to `CREATE` a single example review from 'Tom Hanks' for 'Forrest Gump'.
 
 ---
 
@@ -481,6 +498,13 @@ MERGE (u:User {id: row.id})
 3. **Batch large imports** with `CALL {} IN TRANSACTIONS OF 1000 ROWS`
 4. **Cast data types** — CSV values are always strings
 5. **Handle nulls** — use `CASE` or `coalesce()` for missing values
+
+---
+
+### Slide 5.6 — Hands-on Challenges (Importing)
+
+1.  **LOAD CSV:** Assume a `directors.csv` file exists in your import directory with columns `directorName` and `movieTitle`. Write a `LOAD CSV` query that `MERGE`s the `:Person` node for the director, `MERGE`s the `:Movie` node, and then `MERGE`s the `:DIRECTED` relationship between them.
+2.  **Data Cleanup:** A property `m.revenue` was imported as a string (e.g., "$1,000,000"). Write a query to find all such nodes, remove the `$` and `,`, and convert the revenue to an integer.
 
 ---
 
@@ -576,6 +600,14 @@ Look for:
 - **NodeIndexSeek** ✅ (good — using an index)
 - **AllNodesScan** ❌ (bad — scanning everything)
 - **db hits** — lower is better
+
+---
+
+### Slide 6.6 — Hands-on Challenges (Indexes)
+
+1.  **Create Constraint:** Create a uniqueness constraint to ensure every `:Person` has a unique `name`. Try to create a duplicate person and see the error.
+2.  **Create Index:** Create a range index on the `released` property for `:Movie` nodes.
+3.  **Analyze Performance:** Use `PROFILE` to analyze the query `MATCH (m:Movie) WHERE m.released = 1999 RETURN m.title`. Run it before and after creating the index to see how the query plan changes from a `NodeByLabelScan` and `Filter` to a `NodeIndexSeek`.
 
 ---
 
@@ -719,6 +751,100 @@ records, summary, keys = session.execute_query("MATCH (p:Person) RETURN p.name A
 for record in records:
     print(record["name"])
 ```
+
+---
+
+## TOPIC 8: Performance & Optimization
+
+---
+
+### Slide 8.1 — Proactive vs Reactive Tuning
+
+- **Proactive Tuning (Design Time):**
+  - Your data model is your #1 performance factor. Model for your queries.
+  - Use specific labels and relationship types.
+  - Apply constraints and indexes on frequently looked-up properties.
+  - Always parameterize queries to leverage the execution plan cache.
+
+- **Reactive Tuning (Query Time):**
+  - Use `EXPLAIN` and `PROFILE` to find and fix slow queries.
+  - This is for analyzing queries that are already running slower than expected.
+
+---
+
+### Slide 8.2 — Reading a Query Plan (`PROFILE`)
+
+Query plans are trees of "operators". They are read from top to bottom, but **executed from bottom to top.**
+
+```cypher
+PROFILE MATCH (p:Person {name: 'Tom Hanks'})-[:ACTED_IN]->(m:Movie)
+RETURN m.title
+```
+
+Look for these key operators:
+- **`NodeIndexSeek`**: ✅ **Good!** Used an index to efficiently find the starting `Person` node.
+- **`NodeByLabelScan`**: ❌ **Bad!** Scanned all nodes with the `:Person` label. Indicates a missing index.
+- **`Expand`**: The core of graph traversal. Follows the `:ACTED_IN` relationships.
+- **`Filter`**: Applies a `WHERE` clause. High `db hits` here means the filter is working hard on many rows that will be thrown away.
+- **`ProduceResults`**: Top of the plan, returns the data.
+
+The goal is to have as few **db hits** and **rows** as possible flowing up the plan.
+
+---
+
+### Slide 8.3 — Common Performance Anti-Patterns
+
+- **Disconnected `MATCH` clauses → Cartesian Products**
+  - `MATCH (p:Person), (m:Movie) WHERE p.name = 'Tom' AND m.title = 'Top Gun'`
+  - This matches ALL people with ALL movies, then filters. Very slow.
+  - **Fix:** Connect your patterns: `MATCH (p:Person {name: 'Tom'}), (m:Movie {title: 'Top Gun'})` (if they are unrelated), or better, find a path between them.
+
+- **Filtering Late Instead of Early**
+  - `MATCH (p:Person)-[:ACTED_IN]->(m) WITH p, m WHERE p.name = 'Tom Hanks' RETURN m`
+  - This finds all acting relationships in the graph first, then filters.
+  - **Fix:** Put predicates inside the `MATCH` or in an immediate `WHERE` clause: `MATCH (p:Person {name: 'Tom Hanks'})-[:ACTED_IN]->(m) RETURN m`.
+
+- **Case-Insensitive Searches without a Text Index**
+  - `WHERE toLower(p.name) = 'tom hanks'`
+  - This cannot use a standard range index. It must scan all `:Person` nodes.
+  - **Fix:** Create a `TEXT` index on `p.name` and use `WHERE p.name CONTAINS 'tom hanks'` or a full-text index for more advanced searches.
+
+---
+
+### Slide 8.4 — Eager vs. Lazy Operators
+
+- Most Cypher operators are **lazy**: they stream results one row at a time, using little memory.
+
+- **Eager Operators** are the exception. They block and wait for ALL incoming rows before they can produce their output. This can cause high memory usage or even `OutOfMemoryError` on large datasets.
+
+- **Common Eager Operators:**
+  - Aggregations: `COUNT()`, `COLLECT()`, `SUM()`, `AVG()`
+  - `ORDER BY`
+  - `DISTINCT`
+
+You can spot them in a `PROFILE` plan—they will be marked with `(Eager)`. Be very careful when you sort or collect millions of rows. Use `LIMIT` *before* these operators whenever possible.
+
+```cypher
+// BAD: Sorts all people, then takes 10
+MATCH (p:Person)
+RETURN p.name
+ORDER BY p.name
+LIMIT 10
+
+// GOOD: Finds all people, takes 10, then sorts just those 10
+MATCH (p:Person)
+WITH p LIMIT 10
+RETURN p.name
+ORDER BY p.name
+```
+
+---
+
+### Slide 8.5 — Hands-on Challenges (Performance)
+
+1.  **Analyze a Cartesian Product:** Run `PROFILE MATCH (p:Person), (m:Movie) RETURN p.name, m.title LIMIT 10`. Note the `CartesianProduct` operator and the high number of rows it generates before the `LIMIT`.
+2.  **Fix a Slow Query:** The query `MATCH (p:Person)-[r:ACTED_IN]->(m:Movie) WITH p, r, m WHERE m.released > 2005 RETURN p.name, m.title` is slow. Refactor it to filter earlier. Run `PROFILE` on both versions to see the difference in db hits.
+3.  **See Eager Impact:** Run `PROFILE MATCH (p:Person) RETURN collect(p.name)`. Note the `Eager` operator. Now imagine doing this on a graph with 10 million people.
 
 ---
 

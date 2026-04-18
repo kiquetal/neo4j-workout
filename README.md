@@ -1,5 +1,7 @@
 # Neo4j Workout
 
+This repository is a comprehensive study guide and hands-on coding environment designed to help you prepare for and pass the **Neo4j Certified Professional** exam. It combines structured study materials, practical coding exercises, and a systematic review process to solidify your understanding of Neo4j's core concepts.
+
 Exam prep repo for the **Neo4j Certified Professional** certification.
 
 ## Exam At a Glance
