@@ -693,6 +693,35 @@ try (var s2 = driver.session(SessionConfig.builder()
 
 ---
 
+### Slide 7.8 — Python Driver: `run()` vs `execute_query()`
+
+This is a key distinction in the Python driver (v5.0+), often asked about in exams.
+
+| Feature             | `session.run()`                                | `session.execute_query()` (v5.0+)                                 |
+| :------------------ | :--------------------------------------------- | :---------------------------------------------------------------- |
+| **Return Value**    | `Result` object (iterator)                     | `(records, summary, keys)` tuple                                  |
+| **Evaluation**      | **Lazy** (streams results)                         | **Eager** (loads all results into memory)                             |
+| **Transaction Mgmt.** | Often manual for writes                       | **Automatic** (provides `execute_read/write` helpers)             |
+| **Best For**        | Very large results, streaming, fine-grained control | Most new development, ease of use, getting query stats easily     |
+
+**`session.run()` Example (Lazy Evaluation):**
+```python
+# Data is fetched from the server as the code loops through the iterator
+result = session.run("MATCH (p:Person) RETURN p.name AS name")
+for record in result:
+    print(record["name"])
+```
+
+**`session.execute_query()` Example (Eager Evaluation):**
+```python
+# All data is already loaded into the 'records' list in memory
+records, summary, keys = session.execute_query("MATCH (p:Person) RETURN p.name AS name")
+for record in records:
+    print(record["name"])
+```
+
+---
+
 ## QUICK REFERENCE — Exam Cheat Sheet
 
 ---
