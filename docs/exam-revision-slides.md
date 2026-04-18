@@ -216,12 +216,44 @@ MATCH (a)-[:ACTED_IN]->(m) RETURN a.name AS name, 'Actor' AS role
 UNION ALL
 MATCH (d)-[:DIRECTED]->(m) RETURN d.name AS name, 'Director' AS role
 
-// CALL {} subquery — isolates scope
+// UNION ALL (keeps duplicates, faster)
+MATCH (a)-[:ACTED_IN]->(m) RETURN a.name AS name, 'Actor' AS role
+UNION ALL
+MATCH (d)-[:DIRECTED]->(m) RETURN d.name AS name, 'Director' AS role
+
+// CALL {} subquery — isolates scope and enables variable passing
+// The scope inside CALL {} is isolated. Variables from the outer query are NOT
+// automatically available within the CALL {} block.
+
+// To pass variables INTO a CALL {} subquery:
+// Use a 'WITH' clause BEFORE the CALL {} block to explicitly pass variables.
+WITH 'Tom Hanks' AS actorName // actorName is from the outer scope
 CALL {
-  MATCH (m:Movie) WHERE m.year = $year
-  RETURN m
+  // 'actorName' is now explicitly available inside this subquery
+  MATCH (p:Person {name: actorName})-[:ACTED_IN]->(m:Movie)
+  RETURN m.title AS movieTitle
 }
-RETURN m.title
+RETURN movieTitle
+
+// To retrieve results OUT OF a CALL {} subquery:
+// Use 'RETURN' inside the subquery, and its results become available
+// to the outer query as if it were a subquery producing rows.
+
+// For calling PROCEDURES (e.g., APOC procedures) within a query:
+// Procedures have their own argument passing rules and use 'YIELD'
+// to declare which results from the procedure should be brought into
+// the main query's scope.
+// Variables passed to procedures via their parameter map are accessed
+// within the procedure's own query string (if it runs Cypher).
+
+// Example with a procedure (apoc.cypher.run):
+// The 'name' parameter is passed via the map {name: 'Tom Hanks'}
+// and accessed as $name within the 'apoc.cypher.run' query string.
+CALL apoc.cypher.run(
+    "MATCH (n:Person) WHERE n.name = $name RETURN n.born AS born",
+    {name: 'Tom Hanks'} // Parameters for the procedure's internal query
+) YIELD born // 'born' is yielded from the procedure into the main query scope
+RETURN born
 ```
 
 Rules: UNION queries must return same column names. Use `CALL {}` to post-process UNION results.
