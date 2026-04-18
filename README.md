@@ -23,6 +23,15 @@ Exam prep repo for the **Neo4j Certified Professional** certification.
 | 6 | Indexes & Constraints | Uniqueness, existence, full-text, composite, performance |
 | 7 | Drivers & App Development | Sessions, transactions, connection URIs, error handling |
 
+## Study Materials
+
+### Exam Revision Slides
+
+A key resource in this repository is a comprehensive slide deck covering all major exam topics. It's designed for quick revision and can be viewed directly as an HTML file.
+
+-   **[View the HTML Slides](./docs/exam-revision-slides.html)**
+-   [Edit the Markdown source](./docs/exam-revision-slides.md)
+
 ## Stack
 
 - Java 21+, Maven
@@ -34,7 +43,8 @@ Exam prep repo for the **Neo4j Certified Professional** certification.
 ```
 src/main/java/com/neo4j/workout/   # Java driver examples per topic
 docs/
-  session-tracker.md               # Hyperfocus session scores
+  exam-revision-slides.md          # Markdown source for the slide deck
+  python_driver_notes.md           # Detailed notes on Python driver methods
   gap-log.md                       # Weak spots for review
 ```
 
